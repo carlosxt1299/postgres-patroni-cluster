@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.4.14
+    deploy:
+      replicas: 3
+    environment:
+      - ETCD_NAME=etcd${HOSTNAME: -1}
+      - ETCD_INITIAL_CLUSTER=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd${HOSTNAME: -1}:2379
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd${HOSTNAME: -1}:2380
+    networks:
+      - cluster_net
+
+  patroni1:
+    image: postgres:13
+    environment:
+      - PATRONI_NAME=patroni1
+      - PATRONI_RESTAPI_CONNECT_ADDRESS=patroni1:8008
+      - PATRONI_POSTGRESQL_CONNECT_ADDRESS=patroni1:5432
+      - PATRONI_POSTGRESQL_DATA_DIR=/var/lib/postgresql/data/pgdata
+      - PATRONI_REPLICATION_USERNAME=replicator
+      - PATRONI_REPLICATION_PASSWORD=replicatorpass
+      - PATRONI_SUPERUSER_USERNAME=postgres
+      - PATRONI_SUPERUSER_PASSWORD=postgrespass
+      - PATRONI_admin_PASSWORD=adminpass
+      - PATRONI_ETCD_URL=http://etcd1:2379,http://etcd2:2379,http://etcd3:2379
+    volumes:
+      - patroni1_data:/var/lib/postgresql/data
+      - ./patroni1.yml:/etc/patroni.yml:ro
+    networks:
+      - cluster_net
+    depends_on:
+      - etcd
+
+  patroni2:
+    image: postgres:13
+    environment:
+      - PATRONI_NAME=patroni2
+      - PATRONI_RESTAPI_CONNECT_ADDRESS=patroni2:8008
+      - PATRONI_POSTGRESQL_CONNECT_ADDRESS=patroni2:5432
+      - PATRONI_POSTGRESQL_DATA_DIR=/var/lib/postgresql/data/pgdata
+      - PATRONI_REPLICATION_USERNAME=replicator
+      - PATRONI_REPLICATION_PASSWORD=replicatorpass
+      - PATRONI_SUPERUSER_USERNAME=postgres
+      - PATRONI_SUPERUSER_PASSWORD=postgrespass
+      - PATRONI_admin_PASSWORD=adminpass
+      - PATRONI_ETCD_URL=http://etcd1:2379,http://etcd2:2379,http://etcd3:2379
+    volumes:
+      - patroni2_data:/var/lib/postgresql/data
+      - ./patroni2.yml:/etc/patroni.yml:ro
+    networks:
+      - cluster_net
+    depends_on:
+      - etcd
+
+  haproxy:
+    image: haproxy:2.4
+    ports:
+      - "5432:5432"
+      - "7000:7000"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - cluster_net
+    depends_on:
+      - patroni1
+      - patroni2
+
+volumes:
+  patroni1_data:
+  patroni2_data:
+
+networks:
+  cluster_net:
+    driver: bridge
