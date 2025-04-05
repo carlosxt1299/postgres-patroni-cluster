@@ -35,10 +35,10 @@ bootstrap:
   - host replication replicator 0.0.0.0/0 md5
   - host all all 0.0.0.0/0 md5
 
-postgresql:  
+postgresql:
   listen: 0.0.0.0:5432
   connect_address: patroni2:5432
-  data_dir: /var/lib/postgresql/data/pgdata
+  data_dir: /var/lib/postgresql/data/pgdata 
   bin_dir: /usr/lib/postgresql/13/bin
   authentication:
     replication:
@@ -47,3 +47,4 @@ postgresql:
     superuser:
       username: postgres
       password: postgrespass
+
